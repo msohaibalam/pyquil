@@ -22,8 +22,10 @@ from pyquil.api._base_connection import get_session, post_json
 from pyquil.api._config import PyquilConfig
 from pyquil.api._error_reporting import _record_call
 from pyquil.api._qac import AbstractBenchmarker
-from pyquil.paulis import PauliTerm
+from pyquil.paulis import PauliTerm, is_identity
 from pyquil.quil import address_qubits, Program
+
+import numpy as np
 
 
 class BenchmarkConnection(AbstractBenchmarker):
@@ -54,8 +56,10 @@ class BenchmarkConnection(AbstractBenchmarker):
         :param PauliTerm pauli_in: A PauliTerm to be acted on by clifford via conjugation.
         :return: A PauliTerm corresponding to pauli_in * clifford * pauli_in^{\dagger}
         """
-
-        indices_and_terms = list(zip(*list(pauli_in.operations_as_set())))
+        if is_identity(pauli_in):
+            indices_and_terms = [(0,), ('I',)]
+        else:
+            indices_and_terms = list(zip(*list(pauli_in.operations_as_set())))
 
         payload = ConjugateByCliffordRequest(
             clifford=clifford.out(),
@@ -73,7 +77,7 @@ class BenchmarkConnection(AbstractBenchmarker):
         #  This is maximal set of qubits that can be affected by this conjugation.
         for i, pauli in enumerate(paulis):
             pauli_out *= PauliTerm(pauli, all_qubits[i])
-        return pauli_out * pauli_in.coefficient
+        return pauli_out * np.abs(pauli_in.coefficient)**2
 
     @_record_call
     def generate_rb_sequence(self, depth, gateset, seed=None, interleaver=None):
